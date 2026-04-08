@@ -1,59 +1,63 @@
-This is a demo project written in NextJS. It uses prisma for ORM (which means connects to database)
+This is a simple task manager web app built using Next.js. It uses Prisma as the ORM to connect to a database.
 
-# Run on your local machine
+# Run on local machine (SQLite)
 
-- Step 1, clone this project to your local machine and within the project root folder 
-  install dependencies
-```bash
+- Step 1, clone the project and install dependencies
+
 npm i
-```
-- Step 2, setup database of sqlite (which is just an in 
-memory database only for the ease of testing)
-    - make sure the prisma/schema.prisma file has this
-  ```c
-    datasource db {
-      provider = "sqlite" 
-      url      = env("DATABASE_URL")     
-    }
-  ```
-    - Then Run a migration to create your database tables with Prisma Migrate
-    ```bash
-    npx prisma migrate dev --name init
-    ```
-- Step 3, run dev server to serve the NextJS web app
-    ```bash
-    npm run dev
-    ```
 
-# Run on aws ec2 with a mysql RDS
+- Step 2, setup database (SQLite)
 
-- Step 0, fire up ec2 and mysql rds, set up correctly with their security rules
-    > By default, nextjs dev server run on port 3000 of http, so allow it's request
-- Step 1, clone this project to the ec2 and within the project root folder
-  install dependencies
-```bash
-npm i
-```
-- Step 2, setup database of mysql rds 
-    - ***make sure the prisma/schema.prisma file has this***
-  ```c
-    datasource db {
-      provider = "mysql" 
-      url      = "mysql://USER:PASSWORD@HOST:PORT/DATABASE"  
-    }
-  ```
-  > Change the USER, PASSWORD, PORT and DATABASE of your mysql rds, specifically
-  > you have to have an existing DATABSE within mysql. 
-  > Tables can be created by prisma
+Make sure prisma/schema.prisma has:
 
-    - Then Run a migration to create your database tables with Prisma Migrate
-    ```bash
-    npx prisma migrate dev --name init
-    ```
-- Step 3, run dev server to serve the NextJS web app
-    ```bash
-    npm run dev
-    ```
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+Create a .env file in the root:
+
+DATABASE_URL="file:./prisma/dev.db"
+
+Then run:
+
+npx prisma db push
+npx prisma generate
+
+- Step 3, start the app
+
+npm run dev
 
 
-##
+# Run with AWS RDS (MySQL)
+
+- Step 0, create an RDS MySQL instance and make sure EC2 can connect to it (port 3306 open between them)
+
+- Step 1, update Prisma config
+
+In prisma/schema.prisma:
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+- Step 2, create .env file
+
+DATABASE_URL="mysql://USER:PASSWORD@HOST:3306/DATABASE"
+
+- Step 3, push schema to RDS
+
+npx prisma db push
+npx prisma generate
+
+- Step 4, run the app
+
+npm run dev
+
+
+## Notes
+
+- The app supports creating and deleting tasks
+- Prisma is used to manage database tables
+- SQLite is used for local testing, MySQL RDS is used for cloud deployment
