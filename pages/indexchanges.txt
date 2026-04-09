@@ -1,0 +1,282 @@
+import { Inter } from "next/font/google";
+import { useEffect, useState } from "react";
+import { Button, Form, Input, message, Modal, Select, Space, Table, DatePicker } from "antd";
+import type { ColumnsType } from "antd/es/table";
+import dayjs from "dayjs";
+
+const inter = Inter({ subsets: ["latin"] });
+
+type Task = {
+  id: number;
+  title: string;
+  description?: string;
+  priority: string;
+  status: string;
+  sprint?: string;
+  dueDate?: string;
+  createdAt?: string;
+};
+
+const layout = { labelCol: { span: 8 }, wrapperCol: { span: 16 } };
+const tailLayout = { wrapperCol: { offset: 8, span: 12 } };
+
+export default function Home() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isCreateModal, setIsCreateModal] = useState(false);
+  const [isEditModal, setIsEditModal] = useState(false);
+
+  const [createForm] = Form.useForm();
+  const [editForm] = Form.useForm();
+
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  // -----------------------------
+  // CREATE TASK
+  // -----------------------------
+  const handleCreate = async (values: any) => {
+    const payload = {
+      ...values,
+      dueDate: values.dueDate ? values.dueDate.format("YYYY-MM-DD") : null,
+    };
+
+    setIsCreateModal(false);
+
+    fetch("/api/create_task", {
+      method: "POST",
+      headers: { "Accept": "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(async (res) => {
+        if (res.status === 200) {
+          const newTask = await res.json();
+          message.success("Created task " + newTask.title);
+          setTasks([...tasks, newTask]);
+          createForm.resetFields();
+        } else {
+          message.error("Failed to create task");
+        }
+      })
+      .catch((err) => message.error(err.toString()));
+  };
+
+  // -----------------------------
+  // DELETE TASK
+  // -----------------------------
+  const handleDelete = (task: Task) => {
+    fetch("/api/delete_task", {
+      method: "POST",
+      headers: { "Accept": "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ id: task.id }),
+    })
+      .then(async (res) => {
+        if (res.status === 200) {
+          message.success("Deleted task " + task.title);
+          setTasks(tasks.filter((t) => t.id !== task.id));
+        } else {
+          message.error("Failed to delete task");
+        }
+      })
+      .catch((err) => message.error(err.toString()));
+  };
+
+  // -----------------------------
+  // EDIT TASK (OPEN MODAL)
+  // -----------------------------
+  const handleEditOpen = (task: Task) => {
+    setEditingTask(task);
+    editForm.setFieldsValue({
+      ...task,
+      dueDate: task.dueDate ? dayjs(task.dueDate) : null,
+    });
+    setIsEditModal(true);
+  };
+
+  // -----------------------------
+  // UPDATE TASK
+  // -----------------------------
+  const handleUpdate = async (values: any) => {
+    if (!editingTask) return;
+
+    const payload = {
+      id: editingTask.id,
+      ...values,
+      dueDate: values.dueDate ? values.dueDate.format("YYYY-MM-DD") : null,
+    };
+
+    fetch("/api/update_task", {
+      method: "POST",
+      headers: { "Accept": "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(async (res) => {
+        if (res.status === 200) {
+          const updated = await res.json();
+          message.success("Updated task " + updated.title);
+
+          setTasks(tasks.map((t) => (t.id === updated.id ? updated : t)));
+
+          setIsEditModal(false);
+          setEditingTask(null);
+          editForm.resetFields();
+        } else {
+          message.error("Failed to update task");
+        }
+      })
+      .catch((err) => message.error(err.toString()));
+  };
+
+  // -----------------------------
+  // TABLE COLUMNS
+  // -----------------------------
+  const columns: ColumnsType<Task> = [
+    { title: "ID", dataIndex: "id" },
+    { title: "Title", dataIndex: "title" },
+    { title: "Description", dataIndex: "description" },
+    { title: "Priority", dataIndex: "priority" },
+    { title: "Status", dataIndex: "status" },
+    { title: "Sprint", dataIndex: "sprint" },
+    {
+      title: "Due Date",
+      dataIndex: "dueDate",
+      render: (text) => (text ? dayjs(text).format("YYYY-MM-DD") : ""),
+    },
+    {
+      title: "Action",
+      key: "action",
+      render: (_, record) => (
+        <Space>
+          <a onClick={() => handleEditOpen(record)}>Edit</a>
+          <a onClick={() => handleDelete(record)}>Delete</a>
+        </Space>
+      ),
+    },
+  ];
+
+  // -----------------------------
+  // LOAD TASKS
+  // -----------------------------
+  useEffect(() => {
+    fetch("/api/all_task")
+      .then((res) => res.json())
+      .then((json) => setTasks(json));
+  }, []);
+
+  // -----------------------------
+  // RENDER
+  // -----------------------------
+  return (
+    <>
+      <Button type="primary" onClick={() => setIsCreateModal(true)}>
+        Add Task
+      </Button>
+
+      {/* CREATE MODAL */}
+      <Modal
+        title="Add Task"
+        open={isCreateModal}
+        onCancel={() => { setIsCreateModal(false); createForm.resetFields(); }}
+        footer={null}
+        width={800}
+      >
+        <Form {...layout} form={createForm} onFinish={handleCreate} style={{ maxWidth: 600 }}>
+          <Form.Item name="title" label="Title" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="description" label="Description">
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="priority" label="Priority" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: "Low", label: "Low" },
+                { value: "Medium", label: "Medium" },
+                { value: "High", label: "High" },
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item name="status" label="Status" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: "To Do", label: "To Do" },
+                { value: "In Progress", label: "In Progress" },
+                { value: "Done", label: "Done" },
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item name="sprint" label="Sprint">
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="dueDate" label="Due Date">
+            <DatePicker />
+          </Form.Item>
+
+          <Form.Item {...tailLayout}>
+            <Button type="primary" htmlType="submit">Submit</Button>
+            <Button onClick={() => createForm.resetFields()}>Reset</Button>
+            <Button onClick={() => setIsCreateModal(false)}>Cancel</Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* EDIT MODAL */}
+      <Modal
+        title="Edit Task"
+        open={isEditModal}
+        onCancel={() => { setIsEditModal(false); editForm.resetFields(); }}
+        footer={null}
+        width={800}
+      >
+        <Form {...layout} form={editForm} onFinish={handleUpdate} style={{ maxWidth: 600 }}>
+          <Form.Item name="title" label="Title" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="description" label="Description">
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="priority" label="Priority" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: "Low", label: "Low" },
+                { value: "Medium", label: "Medium" },
+                { value: "High", label: "High" },
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item name="status" label="Status" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: "To Do", label: "To Do" },
+                { value: "In Progress", label: "In Progress" },
+                { value: "Done", label: "Done" },
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item name="sprint" label="Sprint">
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="dueDate" label="Due Date">
+            <DatePicker />
+          </Form.Item>
+
+          <Form.Item {...tailLayout}>
+            <Button type="primary" htmlType="submit">Save Changes</Button>
+            <Button onClick={() => editForm.resetFields()}>Reset</Button>
+            <Button onClick={() => setIsEditModal(false)}>Cancel</Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Table columns={columns} dataSource={tasks} rowKey="id" />
+    </>
+  );
+}
